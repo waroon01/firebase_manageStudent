@@ -1,40 +1,31 @@
-import {
-  collection,
-  getDocs,
-  onSnapshot
-} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
-
+import { collection, getDocs, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 import { db } from "./firebaseConfig.js";
 
+const studentRef = collection(db, "students");
 
-
-const studentRef = collection(db, "students")
-
-const showStudentList = async()=>{
-    const snapshot = await getDocs(studentRef)
-
-   const data = snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
-    return data
-}
-
-
-const watchStudents = () => {
-  const unsubscribe = onSnapshot(studentRef, (snapshot) => {
-    snapshot.forEach((doc) => {
-      console.log(doc.id, doc.data());
-    });
-  });
-
-  console.log(unsubscribe)
-  return unsubscribe; // ไว้หยุดฟัง
+// 1. ดึงข้อมูลครั้งเดียว (สำหรับ PDF)
+export const showStudentList = async () => {
+    const q = query(studentRef, orderBy("studentId", "asc"));
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+    }));
 };
 
+// 2. เฝ้าดูข้อมูล Real-time (สำหรับตารางหน้าเว็บ)
+// รับ callback function เข้ามาเพื่อส่งข้อมูลกลับไปหน้าจอ
+export const watchStudents = (onUpdate) => {
+    const q = query(studentRef, orderBy("createdAt", "desc"));
 
-watchStudents()
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        onUpdate(data);
+    });
 
-
-
-export {showStudentList}
+    return unsubscribe;
+};
