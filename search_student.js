@@ -37,4 +37,4 @@ watchStudents()
 
 
 
-export default showStudentList
+export {showStudentList}

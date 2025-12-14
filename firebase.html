@@ -9,6 +9,10 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
       rel="stylesheet"
     />
+    <!-- pdf make -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.12/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.12/vfs_fonts.js"></script>
+
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap");
       body {
@@ -185,10 +189,12 @@
             </div>
           </form>
         </div>
+        <button id="btn-pdf">pdf</button>
       </div>
     </div>
 
     <script type="module" src="./create_student.js"></script>
     <script type="module" src="./search_student.js"></script>
+    <script type="module" src="./pdfmakePrint.js"></script>
   </body>
 </html>

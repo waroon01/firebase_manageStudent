@@ -5,10 +5,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 import { db } from "./firebaseConfig.js";
-import showStudentList from "./search_student.js";
+import {showStudentList} from "./search_student.js";
+import {generateStudentPDF} from "./pdfmakePrint.js"
 
 const formStudent = document.getElementById("add-student-form");
-
 const createStudent = async (e) => {
   e.preventDefault();
 
@@ -46,3 +46,7 @@ const createStudent = async (e) => {
 };
 
 formStudent.addEventListener("submit", createStudent);
+// 4. จัดการปุ่ม: พิมพ์ PDF
+document.getElementById('btn-pdf').addEventListener('click', () => {
+    generateStudentPDF();
+});
