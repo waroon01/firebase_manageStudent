@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Auth Redirect Demo</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex items-center justify-center">
+
+    <!-- ส่วนที่ 1: หน้า Login -->
+    <div id="login-page" class="hidden w-full max-w-md p-6 bg-white rounded-xl shadow-lg text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">ยินดีต้อนรับ</h1>
+        <p class="text-gray-500 mb-6">กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ</p>
+
+        <!-- Error Message Box (เพิ่มใหม่) -->
+        <div id="error-box" class="hidden mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm text-left">
+            <p class="font-bold">เกิดข้อผิดพลาด:</p>
+            <p id="error-message">Unknown Error</p>
+        </div>
+        
+        <button id="google-login-btn" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-sm">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-6 h-6">
+            <span>เข้าสู่ระบบด้วย Google</span>
+        </button>
+        
+        <p class="mt-6 text-xs text-gray-400">
+            หมายเหตุ: ต้องเพิ่ม Domain ใน Firebase Auth Settings ก่อนใช้งาน
+        </p>
+    </div>
+
+    <!-- ส่วนที่ 2: หน้าโหลด (ระหว่างรอ Redirect Result) -->
+    <div id="loading-page" class="w-full max-w-md p-6 text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p class="text-gray-600">กำลังตรวจสอบสถานะ...</p>
+    </div>
+
+    <!-- ส่วนที่ 3: หน้า Dashboard (เป้าหมายหลัง Login) -->
+    <div id="dashboard-page" class="hidden w-full max-w-lg p-8 bg-white rounded-xl shadow-lg border-t-4 border-blue-500">
+        <div class="flex items-center gap-4 mb-6">
+            <img id="user-photo" src="" alt="Profile" class="w-16 h-16 rounded-full border-2 border-blue-100">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800" id="user-name">User Name</h2>
+                <p class="text-sm text-gray-500" id="user-email">user@example.com</p>
+            </div>
+        </div>
+
+        <div class="bg-blue-50 p-4 rounded-lg mb-6 text-left">
+            <h3 class="font-semibold text-blue-800 mb-2">Access Token Status:</h3>
+            <p id="token-status" class="text-sm text-blue-600 break-all">Checking...</p>
+        </div>
+
+        <button id="logout-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+            ออกจากระบบ
+        </button>
+    </div>
+
+    <!-- Firebase SDK Script -->
+    <script type="module">
+        // Import Firebase Functions
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInWithRedirect, 
+            getRedirectResult, 
+            GoogleAuthProvider, 
+            signOut,
+            onAuthStateChanged,
+            browserLocalPersistence, 
+            setPersistence
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // ------------------------------------------------------------------
+        // TODO: แทนที่ด้วย Firebase Config ของคุณเอง
+        // ------------------------------------------------------------------
+        const firebaseConfig = {
+  apiKey: "AIzaSyAhKMt2-wTBqCUCC4mzHjt8tWxCHBJXC5I",
+  authDomain: "http://127.0.0.1:5500/index.html",
+  projectId: "student-data-app-1c677",
+  storageBucket: "student-data-app-1c677.firebasestorage.app",
+  messagingSenderId: "575305259038",
+  appId: "1:575305259038:web:2ed2df837feb093185f60f"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        
+        // ตั้งค่า Persistence เป็น Local (เพื่อให้จำ session ได้ดีขึ้น)
+        setPersistence(auth, browserLocalPersistence).catch((error) => {
+             console.error("Persistence Error:", error);
+        });
+
+        const provider = new GoogleAuthProvider();
+
+        // UI Elements
+        const loginPage = document.getElementById('login-page');
+        const dashboardPage = document.getElementById('dashboard-page');
+        const loadingPage = document.getElementById('loading-page');
+        const errorBox = document.getElementById('error-box');
+        const errorMessage = document.getElementById('error-message');
+        
+        const loginBtn = document.getElementById('google-login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        // Function: สลับหน้าจอ
+        function showPage(pageName) {
+            loginPage.classList.add('hidden');
+            dashboardPage.classList.add('hidden');
+            loadingPage.classList.add('hidden');
+
+            if (pageName === 'login') loginPage.classList.remove('hidden');
+            else if (pageName === 'dashboard') dashboardPage.classList.remove('hidden');
+            else if (pageName === 'loading') loadingPage.classList.remove('hidden');
+        }
+
+        // Function: แสดง Error
+        function showError(msg) {
+            errorBox.classList.remove('hidden');
+            errorMessage.innerText = msg;
+            showPage('login'); // กลับไปหน้า Login เพื่อให้ลองใหม่
+        }
+
+        // 1. ตรวจสอบผลลัพธ์จากการ Redirect
+        getRedirectResult(auth)
+            .then((result) => {
+                if (result) {
+                    const credential = GoogleAuthProvider.credentialFromResult(result);
+                    const token = credential.accessToken;
+                    console.log("Redirect Success, Token:", token);
+                    document.getElementById('token-status').innerText = "ได้รับ OAuth Access Token แล้ว";
+                    // ไม่ต้องเรียก showPage('dashboard') ที่นี่ เพราะ onAuthStateChanged จะทำงานต่อเอง
+                }
+            })
+            .catch((error) => {
+                console.error("Login Failed:", error);
+                // แสดง Error บนหน้าจอ
+                showError(`Error Code: ${error.code}\nMessage: ${error.message}`);
+            });
+
+        // 2. Listener ตรวจสอบสถานะ User
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("User detected:", user.email);
+                
+                // อัปเดต UI
+                document.getElementById('user-name').innerText = user.displayName;
+                document.getElementById('user-email').innerText = user.email;
+                document.getElementById('user-photo').src = user.photoURL || 'https://via.placeholder.com/150';
+                
+                // ซ่อน Error (ถ้ามี)
+                errorBox.classList.add('hidden');
+                
+                showPage('dashboard');
+            } else {
+                console.log("No user detected");
+                // เราจะแสดงหน้า Login ก็ต่อเมื่อไม่มีการโหลด (แต่ใน structure นี้ Loading จะหายไปเมื่อ showPage('login') ถูกเรียก)
+                // ถ้า getRedirectResult ยังทำงานไม่เสร็จ มันอาจจะแวบมาหน้านี้แป๊บนึง
+                // แต่ถ้า Login ล้มเหลว มันจะมาค้างที่หน้านี้ถูกต้องแล้ว
+                showPage('login');
+            }
+        });
+
+        // 3. ปุ่ม Login
+        loginBtn.addEventListener('click', () => {
+            errorBox.classList.add('hidden'); // เคลียร์ Error เก่า
+            showPage('loading');
+            
+            signInWithRedirect(auth, provider);
+        });
+
+        // 4. ปุ่ม Logout
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                showPage('login');
+            }).catch((error) => {
+                console.error("Logout Error:", error);
+                alert("Logout Failed");
+            });
+        });
+
+    </script>
+</body>
+</html>
